@@ -64,7 +64,7 @@ def metrics():
 @app.route('/train')
 def train():
     global df_forecast
-    query = 'round(sum by (namespace) (rate(container_cpu_usage_seconds_total{container="compose-post-service"}[120s])) / 0.03)'
+    query = 'round(sum by (namespace) (rate(container_cpu_usage_seconds_total{container="compose-post-service"}[120s])) / 0.0003)'
     end = datetime.now().timestamp()
     start = end - (15 * 60 * 60)    # 15 hours in seconds
     step = 5
