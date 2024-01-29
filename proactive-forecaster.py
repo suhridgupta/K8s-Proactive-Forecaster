@@ -4,6 +4,7 @@ import requests
 import json
 from datetime import date, datetime, timedelta
 import os
+import argparse
 
 from flask import Flask, Response
 from prometheus_client import Gauge, generate_latest, REGISTRY
@@ -16,6 +17,14 @@ from tensorflow.keras.losses import MeanSquaredError
 from tensorflow.keras.metrics import RootMeanSquaredError
 from tensorflow.keras.optimizers import Adam
 
+parser = argparse.ArgumentParser()
+parser.add_argument('--app', dest='app', type=str)
+parser.add_argument('run')
+parser.add_argument('--host', dest='host', type=str)
+parser.add_argument('--port', dest='port', type=str)
+args = parser.parse_args()
+print(args.host, args.port)
+
 app = Flask(__name__)
 
 CONTENT_TYPE = str('text/plain; charset=utf-8')
@@ -23,7 +32,7 @@ FORECAST_DELTA = int(os.environ.get('FORECAST_DELTA', '10'))
 
 forecasted_cpu = Gauge(name='forecasted_cpu',
                        documentation='CPU usage forecasted for compose-post-service',
-                       labelnames=['service']
+                       labelnames=['service', 'forecasted_datetime']
                        )
 
 df_forecast = pd.DataFrame(columns=['timestamp', 'forecast', 'value'])
@@ -50,13 +59,13 @@ def metrics():
     
     if abs((closest_timestamp - target_time).total_seconds()) < 5:
         closest_value = df_forecast.loc[df_forecast.index == closest_timestamp, 'forecast'].item()
-    forecasted_cpu.labels(service='compose-post-service')\
+    forecasted_cpu.labels(service='compose-post-service', forecasted_datetime=target_time.strftime('%d/%m/%y %H:%M:%S'))\
             .set(closest_value)
 
     # If training has not been done in the last 1 hour, send GET request
-    if(abs(current_time - last_training_time).total_seconds() > 60 * 60):
+    if(abs(current_time - last_training_time).total_seconds() > 25 * 60):
         print("Beginning model training.")
-        os.system("curl http://localhost:8082/train&")
+        os.system(f'curl http://{args.host}:{args.port}/train&')
         last_training_time = current_time
 
     return Response(generate_latest(REGISTRY.restricted_registry(['forecasted_cpu'])), mimetype=CONTENT_TYPE)
@@ -64,7 +73,7 @@ def metrics():
 @app.route('/train')
 def train():
     global df_forecast
-    query = 'round(sum by (namespace) (rate(container_cpu_usage_seconds_total{container="compose-post-service"}[120s])) / 0.0003)'
+    query = 'round(sum by (namespace) (rate(container_cpu_usage_seconds_total{container="compose-post-service"}[120s])) / 0.03)'
     end = datetime.now().timestamp()
     start = end - (15 * 60 * 60)    # 15 hours in seconds
     step = 5

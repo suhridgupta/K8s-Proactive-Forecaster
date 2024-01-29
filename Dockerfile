@@ -7,4 +7,4 @@ RUN pip install scipy
 RUN pip install Flask
 RUN pip install prometheus-client
 COPY proactive-forecaster.py /proactive-forecaster.py
-CMD flask --app /proactive-forecaster run --port 8082
+CMD flask --app /proactive-forecaster run --host 0.0.0.0 --port 8082
