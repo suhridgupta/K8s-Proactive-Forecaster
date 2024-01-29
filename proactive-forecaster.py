@@ -28,11 +28,11 @@ print(args.host, args.port)
 app = Flask(__name__)
 
 CONTENT_TYPE = str('text/plain; charset=utf-8')
-FORECAST_DELTA = int(os.environ.get('FORECAST_DELTA', '10'))
+FORECAST_DELTA_MINS = int(os.environ.get('FORECAST_DELTA_MINS', '10'))
 
 forecasted_cpu = Gauge(name='forecasted_cpu',
                        documentation='CPU usage forecasted for compose-post-service',
-                       labelnames=['service', 'forecasted_datetime']
+                       labelnames=['service', 'forecast_delta_mins']
                        )
 
 df_forecast = pd.DataFrame(columns=['timestamp', 'forecast', 'value'])
@@ -47,7 +47,7 @@ def metrics():
 
     closest_value = 0.0
     current_time = datetime.now()
-    target_time = current_time + timedelta(minutes=FORECAST_DELTA)
+    target_time = current_time + timedelta(minutes=FORECAST_DELTA_MINS)
     
     print(f'Current time: {current_time}    Requested time: {target_time}')
     
@@ -59,7 +59,7 @@ def metrics():
     
     if abs((closest_timestamp - target_time).total_seconds()) < 5:
         closest_value = df_forecast.loc[df_forecast.index == closest_timestamp, 'forecast'].item()
-    forecasted_cpu.labels(service='compose-post-service', forecasted_datetime=target_time.strftime('%d/%m/%y %H:%M:%S'))\
+    forecasted_cpu.labels(service='compose-post-service', forecast_delta_mins=FORECAST_DELTA_MINS)\
             .set(closest_value)
 
     # If training has not been done in the last 1 hour, send GET request
